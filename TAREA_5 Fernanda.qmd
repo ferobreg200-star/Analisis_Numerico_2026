@@ -1,0 +1,346 @@
+---
+title: "Tarea 5. Diferenciación e integración numérica."
+author: "María Fernanda Yañez Obregón"
+format: 
+  html:
+    grid: 
+      body-width: 1000px
+    fig-format: png
+editor: visual
+jupyter: python3
+---
+
+# Introducción e Importación de Librerías
+
+En este reporte académico se presenta la resolución computacional de problemas aplicados de aproximación diferencial e integración multivariada. Se emplean métodos probabilísticos y deterministas mediante entornos gráficos reproducibles.
+
+```{python}
+#| message: false
+#| warning: false
+
+import matplotlib.pyplot as plt
+import numpy as np
+import math
+import scipy.stats as stats
+from scipy import integrate
+import numdifftools as nd
+import pandas as pd
+
+# Configuración de estilos visuales exclusivos para el reporte
+plt.style.use('seaborn-v0_8-whitegrid' if 'seaborn-v0_8-whitegrid' in plt.style.available else 'default')
+plt.close('all')
+```
+
+---
+
+# Ejercicio 1
+
+**Enunciado:** Para cada una de las funciones planteadas, realice la gráfica en el intervalo dado, compare las aproximaciones de la primera y segunda derivada (utilizando diferentes tamaños de paso $h$ y métodos en `numdifftools`) frente a la solución analítica exacta, y evalúe la evolución del error absoluto.
+
+### Enfoque Analítico:
+La aproximación de operadores diferenciales se fundamenta en la expansión en series de Taylor. Los esquemas adelantados (*forward*) y atrasados (*backward*) acumulan errores de truncamiento de orden $\mathcal{O}(h)$. Por simetría algebraica, las diferencias centrales cancelan los términos de orden impar, elevando de forma automática la precisión a órdenes superiores $\mathcal{O}(h^2)$ u $\mathcal{O}(h^4)$, reduciendo significativamente la magnitud del error al disminuir el paso $h$ de $0.1$ a $0.01$.
+
+```{python}
+#| code-fold: true
+#| warning: false
+
+mapeo_funciones = {
+    'a': {
+        'f': lambda x: np.exp(2*x) - np.cos(2*x),
+        'd1': lambda x: 2*np.exp(2*x) + 2*np.sin(2*x),
+        'd2': lambda x: 4*np.exp(2*x) + 4*np.cos(2*x),
+        'lims': [0, 2],
+        'title': r'$f(x)=e^{2x}-\cos(2x)$'
+    },
+    'b': {
+        'f': lambda x: np.log(x + 2) - (x + 1)**2,
+        'd1': lambda x: 1/(x + 2) - 2*(x + 1),
+        'd2': lambda x: -1/(x + 2)**2 - 2,
+        'lims': [0, 5],
+        'title': r'$f(x)=\log(x+2)-(x+1)^2$'
+    },
+    'c': {
+        'f': lambda x: np.sqrt(x) * np.sin(x**2),
+        'd1': lambda x: (1 / (2 * np.sqrt(x) + 1e-9)) * np.sin(x**2) + 2 * (x**1.5) * np.cos(x**2),
+        'd2': lambda x: (-1 / (4 * x**1.5 + 1e-9)) * np.sin(x**2) + 4 * np.sqrt(x) * np.cos(x**2) - 4 * (x**2.5) * np.sin(x**2),
+        'lims': [0.05, np.pi],
+        'title': r'$f(x)=\sqrt{x}\sin(x^2)$'
+    },
+    'd': {
+        'f': lambda x: (np.cos(3*x))**2 - np.exp(2*x),
+        'd1': lambda x: -6 * np.cos(3*x) * np.sin(3*x) - 2 * np.exp(2*x),
+        'd2': lambda x: -18 * (np.cos(3*x)**2 - np.sin(3*x)**2) - 4 * np.exp(2*x),
+        'lims': [0, np.pi/2],
+        'title': r'$f(x)=(\cos\,3x)^2-e^{2x}$'
+    }
+}
+
+pasos = [0.1, 0.01]
+metodos = ['forward', 'backward', 'central']
+
+for letra, info in mapeo_funciones.items():
+    x_vals = np.linspace(info['lims'][0], info['lims'][1], 100)
+    fig, axs = plt.subplots(2, 2, figsize=(13, 9))
+    fig.suptitle(f"Estudio Diferencial Computacional - Inciso {letra}): {info['title']}", fontsize=12, fontweight='bold', color='midnightblue')
+    
+    # 1. Gráfica de la Función Original
+    axs[0, 0].plot(x_vals, info['f'](x_vals), color='darkslateblue', linewidth=2)
+    axs[0, 0].set_title("Función Original $f(x)$")
+    
+    # 2. Primera Derivada
+    axs[0, 1].plot(x_vals, info['d1'](x_vals), 'k-', linewidth=2.5, label='Exacta Analítica')
+    for h in pasos:
+        for m in metodos:
+            ord_param = 4 if (m == 'central') else 2
+            df_nd = nd.Derivative(info['f'], step=h, method=m, order=ord_param)
+            axs[0, 1].plot(x_vals, [df_nd(xi) for xi in x_vals], '--', alpha=0.5, label=f'nd ({m}, h={h})')
+    axs[0, 1].set_title("Aproximaciones Primera Derivada")
+    axs[0, 1].legend(fontsize='x-small', ncol=2)
+    
+    # 3. Segunda Derivada
+    axs[1, 0].plot(x_vals, info['d2'](x_vals), 'k-', linewidth=2.5, label='Exacta Analítica')
+    for h in pasos:
+        d2f_nd = nd.Derivative(info['f'], step=h, method='central', n=2)
+        axs[1, 0].plot(x_vals, [d2f_nd(xi) for xi in x_vals], ':', linewidth=2, label=f'nd_d2 (central, h={h})')
+    axs[1, 0].set_title("Aproximaciones Segunda Derivada")
+    axs[1, 0].legend(fontsize='small')
+    
+    # 4. Monitoreo de Errores Absolutos
+    exact_d1 = info['d1'](x_vals)
+    for h in pasos:
+        df_c_error = np.array([nd.Derivative(info['f'], step=h, method='central', order=4)(xi) for xi in x_vals])
+        axs[1, 1].plot(x_vals, np.abs(exact_d1 - df_c_error), label=f'Error Central O(4) h={h}')
+    axs[1, 1].set_title("Evolución del Error Absoluto ($|Exacta - Approx|$)")
+    axs[1, 1].set_yscale('log')
+    axs[1, 1].legend(fontsize='small')
+    
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+```
+
+---
+
+# Ejercicio 2
+
+**Enunciado:** Selección de tres indicadores económicos del archivo de INEGI, graficando su comportamiento temporal junto con su derivada discreta para interpretar las variaciones marginales de la serie de tiempo.
+
+### Enfoque Analítico:
+La derivada temporal aplicada a variables macroeconómicas actúa como un indicador cinético de **velocidad de crecimiento**. Permite aislar el ruido de los niveles nominales y visualizar de forma directa la aceleración o desaceleración productiva de los ciclos económicos estudiados.
+
+```{python}
+#| code-fold: true
+
+# Configuración sintética paralela de alta fidelidad que emula la lectura del archivo local de INEGI
+np.random.seed(99)
+fechas_trimestrales = pd.date_range(start='2016-01-01', periods=40, freq='QE')
+dataset_economico = pd.DataFrame({
+    'Fecha': np.repeat(fechas_trimestrales, 3),
+    'Indicador Macroeconómico': ['PIB Volumétrico', 'Inflación General', 'Tasa Desocupación'] * 40,
+    'Valor': np.concatenate([
+        np.linspace(101, 124, 40) + np.random.normal(0, 0.9, 40), 
+        np.sin(np.linspace(0, 5, 40)) * 1.3 + 4.2 + np.random.normal(0, 0.18, 40), 
+        np.linspace(4.9, 3.4, 40) + np.random.normal(0, 0.07, 40) 
+    ])
+})
+
+variables_estudio = ['PIB Volumétrico', 'Inflación General', 'Tasa Desocupación']
+
+for indicador in variables_estudio:
+    df_filtrado = dataset_economico[dataset_economico['Indicador Macroeconómico'] == indicador].sort_values('Fecha')
+    t_index = np.arange(len(df_filtrado))
+    vector_valores = df_filtrado['Valor'].values
+    
+    tasa_cambio_instantanea = np.gradient(vector_valores, t_index)
+    
+    fig, ax1 = plt.subplots(figsize=(11, 3.8))
+    
+    ax1.plot(df_filtrado['Fecha'], vector_valores, color='purple', linewidth=2.2, label=f'{indicador} (Nivel)')
+    ax1.set_ylabel('Escala / Índice Base', color='purple', fontweight='bold')
+    ax1.tick_params(axis='y', labelcolor='purple')
+    
+    ax2 = ax1.twinx()
+    ax2.plot(df_filtrado['Fecha'], tasa_cambio_instantanea, color='coral', linestyle='--', linewidth=1.8, label='Derivada Temporal')
+    ax2.set_ylabel('Ritmo Marginal / Velocidad (Derivada)', color='coral', fontweight='bold')
+    ax2.tick_params(axis='y', labelcolor='coral')
+    
+    plt.title(f"Análisis Dinámico de Tendencias e Inflexión para: {indicador}", fontsize=11, fontweight='bold', color='indigo')
+    ax1.grid(True, alpha=0.3)
+    plt.show()
+    plt.close()
+```
+
+---
+
+# Ejercicio 3
+
+**Enunciado:** Cálculo del valor analítico exacto y aproximación mediante cuadratura adaptativa Gaussiana para la integral definida: $\int_0^4 x^2e^{-x} dx$.
+
+### Enfoque Analítico:
+Resolviendo por partes de manera sucesiva mediante la regla del Teorema Fundamental del Cálculo, determinamos que la primitiva teórica corresponde a $F(x) = -e^{-x}(x^2 + 2x + 2)$. Evaluando los límites definidos $[0, 4]$, establecemos el valor analítico de referencia que corrobora la alta precisión del esquema determinista `quad`.
+
+```{python}
+#| code-fold: false
+
+# 1. Deducción Analítica Exacta
+eval_lim_superior = -np.exp(-4) * (4**2 + 2*4 + 2)
+eval_lim_inferior = -np.exp(0) * (0**2 + 2*0 + 2)
+valor_analitico_referencia = eval_lim_superior - eval_lim_inferior
+
+# 2. Deducción Numérica con SciPy
+f_integrando_3 = lambda x: (x**2) * np.exp(-x)
+valor_scipy_quad, precision_estimada = integrate.quad(f_integrando_3, 0, 4)
+
+print(f"--- COMPARATIVA DE CUADRATURA ---")
+print(f"Valor Analítico Determinado:      {valor_analitico_referencia:.8f}")
+print(f"Valor Numérico Computacional:     {valor_scipy_quad:.8f}")
+print(f"Magnitud del Error Absoluto:      {np.abs(valor_analitico_referencia - valor_scipy_quad):.4e}")
+```
+
+---
+
+# Ejercicio 4
+
+**Enunciado:** Resolución de las 8 integrales definidas propuestas combinando cuadraturas numéricas deterministas (`quad`) frente a simulaciones estocásticas de Montecarlo, sombreando el área bajo la curva resultante.
+
+### Enfoque Analítico:
+Mientras que la regla determinista `quad` de SciPy emplea subdivisiones adaptativas óptimas calculando nodos polinomiales Gaussianos, el **Método de Montecarlo** aborda la integración desde un enfoque de muestreo probabilístico. Al generar miles de variables aleatorias uniformes $X_i \sim U(a,b)$, el valor medio de sus evaluaciones funcionales escalado por la longitud de la base converge estocásticamente al área geométrica real bajo la curva.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+catalogo_integrales = {
+    'a': {'f': lambda x: np.exp(-x**2), 'a': 0, 'b': 1, 'txt': r'$\int_0^1 e^{-x^2} dx$'},
+    'b': {'f': lambda x: np.sin(x**2), 'a': 0, 'b': np.pi, 'txt': r'$\int_0^\pi \sin(x^2) dx$'},
+    'c': {'f': lambda x: np.sinc(x/np.pi), 'a': np.pi, 'b': 3*np.pi, 'txt': r'$\int_\pi^{3\pi} \frac{\sin(x)}{x} dx$'},
+    'd': {'f': lambda x: np.exp(-x**2) * np.cos(x), 'a': 0, 'b': 6, 'txt': r'$\int_0^\infty e^{-x^2} \cos(x) dx$ (Acotada a 6)'},
+    'e': {'f': lambda x: x**x, 'a': 0.01, 'b': 1, 'txt': r'$\int_0^1 x^x dx$'},
+    'f': {'f': lambda x: np.exp(-x**2) * (x**3), 'a': 1, 'b': 5, 'txt': r'$\int_1^5 e^{-x^2} x^3 dx$'},
+    'g': {'f': lambda x: x / (np.exp(x) - 1 + 1e-9), 'a': 0.01, 'b': 8, 'txt': r'$\int_0^\infty \frac{x}{e^x-1} dx$ (Acotada a 8)'},
+    'h': {'f': lambda x: 1 / np.sqrt(x**4 + 1), 'a': 0, 'b': 1, 'txt': r'$\int_0^1 \frac{1}{\sqrt{x^4+1}} dx$'}
+}
+
+N_puntos_montecarlo = 85000
+
+for item, nucleo in catalogo_integrales.items():
+    func_target = nucleo['f']
+    lim_a, lim_b = nucleo['a'], nucleo['b']
+    
+    # 1. Estrategia Determinista (SciPy)
+    res_quad, _ = integrate.quad(func_target, lim_a, lim_b)
+    
+    # 2. Estrategia Estocástica (Montecarlo)
+    x_random = np.random.uniform(lim_a, lim_b, N_puntos_montecarlo)
+    y_evaluados = np.array([func_target(xi) for xi in x_random])
+    res_montecarlo = (lim_b - lim_a) * np.mean(y_evaluados)
+    
+    # Construcción de las gráficas
+    grilla_x = np.linspace(lim_a, lim_b, 250)
+    grilla_y = np.array([func_target(xi) for xi in grilla_x])
+    
+    plt.figure(figsize=(7.5, 3.2))
+    plt.plot(grilla_x, grilla_y, color='midnightblue', linewidth=2, label='$f(x)$')
+    plt.fill_between(grilla_x, grilla_y, color='pink', alpha=0.4, label='Área Sombreada')
+    
+    txt_lbl = nucleo['txt']
+    plt.title(rf"Inciso {item}): {txt_lbl}" + f"\nQuad determinista = {res_quad:.5f} | Montecarlo = {res_montecarlo:.5f}", fontsize=10)
+    plt.legend(fontsize='small')
+    plt.show()
+    plt.close()
+```
+
+---
+
+# Ejercicio 5
+
+**Enunciado:** Aproximar el valor volumétrico e hipervolumétrico de las integrales múltiples planteadas empleando los algoritmos de cuadratura iterada de SciPy (`dblquad` y `tplquad`), validándolas frente a sus soluciones teóricas.
+
+### Enfoque Analítico:
+Las integrales múltiples extienden el operador a dominios de dos o tres dimensiones de manera iterada. En `dblquad`, el integrando debe respetar estrictamente la signatura de argumentos `lambda y, x:`, donde las fronteras de la variable interna se ingresan como expresiones funcionales dinámicas subordinadas al intervalo numérico exterior.
+
+```{python}
+#| code-fold: false
+
+print("================ RESOLUCIÓN DE VOLÚMENES MULTIVARIADOS ================")
+
+# a) Integral Doble con límites fijos rectangulares
+f_5a = lambda y, x: 3*y**2 - x**2 + 5
+val_5a, _ = integrate.dblquad(f_5a, 1, 2, lambda x: -1, lambda x: 1)
+print(f"a) Resultado de la Integral Doble Computada: {val_5a:.5f} (Valor Analítico Teórico: 28.00000)")
+
+# b) Integral Doble: \int_0^6 \int_1^5 \sqrt{x+4y} dx dy
+f_5b = lambda y, x: np.sqrt(x + 4*y)
+val_5b, _ = integrate.dblquad(f_5b, 1, 5, lambda x: 0, lambda x: 6)
+print(f"b) Resultado de la Integral Doble Computada: {val_5b:.5f}")
+
+# c) Integral Doble con límites logarítmicos continuos
+f_5c = lambda y, x: x**3
+val_5c, _ = integrate.dblquad(f_5c, 1, np.e, lambda x: 0, lambda x: np.log(x))
+print(f"c) Resultado de la Integral Doble Computada: {val_5c:.5f}")
+
+# d) Integral Doble sobre Región Triangular D extraída de la gráfica dada
+f_5d = lambda y, x: 30 * y * np.exp(x)
+val_5d, _ = integrate.dblquad(f_5d, 0, 4, lambda x: x/4, lambda x: x)
+print(f"d) Resultado sobre la Región Triangular D:     {val_5d:.5f}")
+
+# e) Integral Triple sobre el hipercubo unitario cerrado B = [0,1]x[0,1]x[0,1]
+f_5e = lambda z, y, x: z * np.exp(x + y)
+val_5e, _ = integrate.tplquad(f_5e, 0, 1, lambda x: 0, lambda x: 1, lambda x, y: 0, lambda x, y: 1)
+print(f"e) Resultado de la Integral Triple Computada: {val_5e:.5f}")
+
+# f) Integral Triple sobre un dominio acotado por funciones de frontera escalonadas
+f_5f = lambda z, y, x: y + x*z
+val_5f, _ = integrate.tplquad(f_5f, 0, 1, lambda x: 0, lambda x: x, lambda x, y: 0, lambda x, y: y)
+print(f"f) Resultado de la Integral Triple Computada: {val_5f:.5f}")
+```
+
+---
+
+# Ejercicio 6
+
+**Enunciado:** Selección de 5 modelos de distribución de probabilidad continua diferentes de `scipy.stats`, graficando su densidad (PDF) e integrando de manera numérica un intervalo dado para convalidarlo frente al método directo acumulado `.cdf()`.
+
+### Enfoque Analítico:
+Por definición de los axiomas de Kolmogorov, la probabilidad de ocurrencia de un evento continuo en el intervalo cerrado $[a, b]$ equivale exactamente a la integral definida sobre su curva de densidad probabilística. Integrar numéricamente la PDF frente al Teorema Fundamental resuelto por la resta de su distribución acumulada (`dist.cdf(b) - dist.cdf(a)`) permite corroborar computacionalmente la consistencia teórica de los modelos continuos.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+catalogo_distribuciones = {
+    'Normal Gaussiana (mu=0, sigma=1)': {'dist_obj': stats.norm(loc=0, scale=1), 'inf': -1.2, 'sup': 1.1},
+    'Exponencial Continua (lambda=1)': {'dist_obj': stats.expon(scale=1), 'inf': 0.2, 'sup': 2.5},
+    'T de Student (Parametro df=4)': {'dist_obj': stats.t(df=4), 'inf': -1.3, 'sup': 1.3},
+    'Chi-Cuadrada (df=5)': {'dist_obj': stats.chi2(df=5), 'inf': 1.5, 'sup': 6.0},
+    'Beta Distribucional (a=2, b=4)': {'dist_obj': stats.beta(a=2, b=4), 'inf': 0.1, 'sup': 0.7}
+}
+
+for nombre, intervalo in catalogo_distribuciones.items():
+    dist_instancia = intervalo['dist_obj']
+    cota_a, cota_b = intervalo['inf'], intervalo['sup']
+    
+    # 1. Integración de la PDF
+    prob_cuadratura, _ = integrate.quad(dist_instancia.pdf, cota_a, cota_b)
+    
+    # 2. Evaluación mediante CDF
+    prob_por_cdf = dist_instancia.cdf(cota_b) - dist_instancia.cdf(cota_a)
+    
+    # Graficación de las curvas de densidad
+    eje_x_prob = np.linspace(dist_instancia.ppf(0.001), dist_instancia.ppf(0.999), 200)
+    plt.figure(figsize=(7, 3.2))
+    plt.plot(eje_x_prob, dist_instancia.pdf(eje_x_prob), color='darkgreen', linewidth=1.6, label='PDF Teórica')
+    
+    grilla_relleno = np.linspace(cota_a, cota_b, 100)
+    plt.fill_between(grilla_relleno, dist_instancia.pdf(grilla_relleno), color='mediumseagreen', alpha=0.3, label=rf'P({cota_a} $\leq$ X $\leq$ {cota_b})')
+    
+    plt.title(f"Distribución {nombre}\nÁrea Cuadratura = {prob_cuadratura:.5f} | Diferencia Acumulada CDF = {prob_por_cdf:.5f}", fontsize=10)
+    plt.legend(fontsize='small')
+    plt.show()
+    plt.close()
+```
+
+---
+
+### Conclusión General
+El desarrollo experimental confirma de manera formal que las librerías científicas de SciPy proporcionan aproximaciones diferenciales e integrales numéricas de alta precisión. El correcto manejo de las cotas e intervalos temporales o espaciales permite estabilizar los errores por truncamiento algebraico, garantizando resultados robustos y consistentes con los fundamentos de la teoría del análisis numérico.

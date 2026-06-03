@@ -1,0 +1,998 @@
+---
+title: "Tarea 6. Ecuaciones diferenciales ordinarias."
+author: "María Fernanda Yañez Obregón"
+lang: es
+format: 
+  html:
+    grid:
+      body-width: 1200px
+    fig-format: png
+editor: visual
+jupyter: python3
+---
+
+# Introducción e Importación de Librerías
+
+En este documento se expone el desarrollo computacional estructurado para la resolución numérica de los problemas de valor inicial planteados en la Tarea 6. Se configuran las librerías científicas centrales y se homogeniza un entorno gráfico de alta visibilidad para el análisis dinámico.
+
+```{python}
+#| message: false
+#| warning: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import integrate
+
+# Paleta estética de alta visibilidad para reportes profesionales
+plt.style.use('seaborn-v0_8-whitegrid' if 'seaborn-v0_8-whitegrid' in plt.style.available else 'default')
+
+# Limpieza preventiva del buffer de imágenes
+plt.close('all')
+```
+
+---
+
+# Ejercicio 1
+
+**Enunciado:** Estudio térmico mediante la Ley de Enfriamiento de Newton. Se modela el descenso de temperatura de una sustancia expuesta a un medio controlado, Una taza de café a una temperatura inicial de 95 °C se introduce en un ambiente mantenido constantemente a 18 °C. Si la velocidad de enfriamiento registrada es de 2 °C/min al alcanzar los 70 °C, determine analíticamente el coeficiente de proporcionalidad $k$ y grafique la curva del comportamiento transitorio.
+
+### Enfoque Analítico:
+El cambio de temperatura en el tiempo obedece a la relación diferencial $\frac{dT}{dt} = k(T - T_s)$. Al evaluar las condiciones de frontera locales dadas:
+$$-2 = k(70 - 18) \implies -2 = 52k \implies k = -\frac{1}{26} \approx -0.038462$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+coef_k = -1 / 26
+temp_ambiente = 18
+
+def modelado_termico(t, T):
+    return coef_k * (T - temp_ambiente)
+
+sim_e1 = integrate.solve_ivp(modelado_termico, [0, 120], [95], t_eval=np.linspace(0, 120, 500))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e1.t, sim_e1.y[0], color='seagreen', linewidth=2.5, label='Evolución de Temperatura $T(t)$')
+plt.axhline(temp_ambiente, color='darkred', linestyle=':', linewidth=1.5, label='Asíntota Térmica ($18^\\circ$C)')
+plt.xlabel('Tiempo transcurrido (min)')
+plt.ylabel('Escala Térmica ($^\\circ$C)')
+plt.title('Ejercicio 1: Dinámica de Disipación Térmica', fontweight='bold', color='darkgreen')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 2
+
+**Enunciado:** Obtención del perfil de solución aproximado para el problema de valor inicial unidimensional gobernado por la ecuación diferencial $y' = t - ty$, restringido por la condición de origen $y(1)=0$.
+
+### Enfoque Analítico:
+Nos enfrentamos a una ecuación diferencial ordinaria de primer orden de coeficientes variables acoplados al tiempo. Procedemos con su resolución en el espacio continuo partiendo del instante $t_0=1$.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def campo_e2(t, y):
+    return t - t * y[0]
+
+sim_e2 = integrate.solve_ivp(campo_e2, [1, 5], [0], t_eval=np.linspace(1, 5, 250))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e2.t, sim_e2.y[0], color='teal', linewidth=2.2, label='Curva integral $y(t)$')
+plt.xlabel('Eje de Tiempo (t)')
+plt.ylabel('Variable de Estado (y)')
+plt.title('Ejercicio 2: Trayectoria Numérica de Primer Orden', fontweight='bold', color='darkcyan')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 3
+
+**Enunciado:** Transformación y simulación de la ecuación diferencial ordinaria lineal no homogénea de segundo orden con condiciones de inicio: $u''-3u'-1.5 u= 8\,\sin(3t)$, sujeta a las restricciones $u(1)=-0.5$ y $u'(1)=1$. Formule el espacio de estados bidimensional de primer orden y grafique sus funciones.
+
+### Enfoque Analítico:
+Estableciendo el cambio de coordenadas cinemáticas $v = u'$ (donde $v$ denota la velocidad instantánea del sistema), la derivada de mayor orden se reduce a $v' = 3v + 1.5u + 8\sin(3t)$. El vector de variables acopladas mapea simultáneamente la posición y su tasa de cambio.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def espacio_estados_e3(t, U):
+    u_pos, v_vel = U
+    return [v_vel, 8*np.sin(3*t) + 3*v_vel + 1.5*u_pos]
+
+sim_e3 = integrate.solve_ivp(espacio_estados_e3, [1, 3], [-0.5, 1], t_eval=np.linspace(1, 3, 250))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e3.t, sim_e3.y[0], color='mediumblue', linewidth=2, label='Posición u(t)')
+plt.plot(sim_e3.t, sim_e3.y[1], color='darkorange', linestyle='--', linewidth=1.5, label='Velocidad v(t)')
+plt.xlabel('Tiempo (t)')
+plt.ylabel('Amplitud de los Estados')
+plt.title('Ejercicio 3: Respuesta Dinámica del Sistema Lineal', fontweight='bold', color='navy')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 4
+
+**Enunciado:** Simulación del oscilador armónico simple ideal libre de amortiguamiento: $y'' + 4y = 0$, con condiciones iniciales de desplazamiento unitario y reposo $y(0) = 1,\ y'(0) = 0$.
+### Enfoque Analítico:
+Al no existir fuerzas disipativas ni excitaciones externas, el sistema conserva de manera íntegra su energía mecánica. Al definir el estado $v = y'$, estructuramos el sistema canónico plano:
+$$y' = v, \quad v' = -4y$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_armonico_simple(t, U):
+    return [U[1], -4*U[0]]
+
+sim_e4 = integrate.solve_ivp(f_armonico_simple, [0, 15], [1, 0], t_eval=np.linspace(0, 15, 400))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e4.t, sim_e4.y[0], color='darkviolet', linewidth=2, label='Desplazamiento $y(t)$')
+plt.plot(sim_e4.t, sim_e4.y[1], color='springgreen', linestyle='--', label='Velocidad $y\'(t)$')
+plt.xlabel('Tiempo (t)')
+plt.title('Ejercicio 4: Oscilador Armónico Conservativo', fontweight='bold', color='purple')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 5
+
+**Enunciado:** Análisis dinámico de un oscilador con amortiguamiento viscoso lineal: $y'' + 0.5y' + 4y = 0$, inicializado bajo los parámetros $y(0) = 2,\ y'(0) = 0$[cite: 68].
+
+### Enfoque Analítico:
+La adición del término de resistencia en la primera derivada ($0.5y'$) disipa de manera continua la energía cinética del sistema, induciendo una respuesta subamortiguada. Reducimos el sistema lineal a:
+$$y' = v, \quad v' = -0.5v - 4y$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_amortiguado(t, U):
+    return [U[1], -0.5*U[1] - 4*U[0]]
+
+sim_e5 = integrate.solve_ivp(f_amortiguado, [0, 20], [2, 0], t_eval=np.linspace(0, 20, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e5.t, sim_e5.y[0], color='crimson', linewidth=2, label='Desplazamiento $y(t)$')
+plt.plot(sim_e5.t, sim_e5.y[1], color='slategrey', linestyle='--', label='Velocidad $y\'(t)$')
+plt.xlabel('t')
+plt.title('Ejercicio 5: Atenuación Dinámica (Subamortiguado)', fontweight='bold', color='darkred')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 6
+
+**Enunciado:** Modelado de un oscilador lineal forzado armónicamente: $y'' + 2y' + y = \cos(t)$, con parámetros de entrada iniciales $y(0) = 0,\ y'(0) = 1$.
+
+### Enfoque Analítico:
+El forzamiento sinusoidal externo gobernará el estado de régimen permanente tras disiparse los efectos transitorios gobernados por la fricción. Expresamos el sistema como:
+$$y' = v, \quad v' = \cos(t) - 2v - y$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_forzado(t, U):
+    return [U[1], np.cos(t) - 2*U[1] - U[0]]
+
+sim_e6 = integrate.solve_ivp(f_forzado, [0, 25], [0, 1], t_eval=np.linspace(0, 25, 500))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e6.t, sim_e6.y[0], color='forestgreen', linewidth=2, label='Posición $y(t)$')
+plt.plot(sim_e6.t, sim_e6.y[1], color='darkorange', linestyle='--', label='Velocidad $y\'(t)$')
+plt.xlabel('t')
+plt.title('Ejercicio 6: Comportamiento del Oscilador Forzado', fontweight='bold', color='darkgreen')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 7
+
+**Enunciado:** Simulación numérica de una ecuación diferencial no lineal de segundo orden con excitación forzada: $y'' = -y^3 + \cos(t)$, sujeta a las condiciones de reposo iniciales $y(0) = 0,\ y'(0) = 0$.
+
+### Enfoque Analítico:
+La fuerza de restauración de orden cúbico (término $-y^3$) rompe con el principio de superposición lineal, modificando sustancialmente las frecuencias naturales del sistema:
+$$y' = v, \quad v' = -y^3 + \cos(t)$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_no_lineal_s2(t, U):
+    return [U[1], -U[0]**3 + np.cos(t)]
+
+sim_e7 = integrate.solve_ivp(f_no_lineal_s2, [0, 20], [0, 0], t_eval=np.linspace(0, 20, 500))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e7.t, sim_e7.y[0], color='midnightblue', linewidth=2, label='Respuesta $y(t)$')
+plt.plot(sim_e7.t, sim_e7.y[1], color='deeppink', linestyle='--', label='Velocidad $y\'(t)$')
+plt.xlabel('t')
+plt.title('Ejercicio 7: Sistema No Lineal de Segundo Orden', fontweight='bold', color='blue')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 8
+
+**Enunciado:** Dinámica con amortiguamiento no lineal cuadrático: $y'' + y'^2 + y = 0$, con valores iniciales establecidos en $y(0) = 1,\ y'(0) = -1$.
+
+### Enfoque Analítico:
+La fuerza disipativa se acopla al cuadrado de la velocidad instantánea ($v^2$), modelando de manera física el arrastre de fluidos de carácter aerodinámico:
+$$y' = v, \quad v' = -v^2 - y$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_amort_cuadratico(t, U):
+    return [U[1], -U[1]**2 - U[0]]
+
+sim_e8 = integrate.solve_ivp(f_amort_cuadratico, [0, 10], [1, -1], t_eval=np.linspace(0, 10, 350))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e8.t, sim_e8.y[0], color='darkcyan', linewidth=2, label='y(t)')
+plt.plot(sim_e8.t, sim_e8.y[1], color='chocolate', linestyle='--', label="y'(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 8: Disipación Aerodinámica Cuadrática', fontweight='bold', color='teal')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 9
+
+**Enunciado:** Modelado exacto de un péndulo simple no lineal: $\theta'' + \sin(\theta) = 0$, inicializado con una amplitud angular inicial de $\theta(0) = \frac{\pi}{4}$ y en reposo $\theta'(0) = 0$.
+
+### Enfoque Analítico:
+Al mantener de manera rigurosa la componente sinusoidal ($\sin\theta$), preservamos las propiedades cualitativas reales del movimiento pendular para amplitudes considerables:
+$$\theta' = v, \quad v' = -\sin(\theta)$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_pendulo_exacto(t, U):
+    return [U[1], -np.sin(U[0])]
+
+sim_e9 = integrate.solve_ivp(f_pendulo_exacto, [0, 20], [np.pi/4, 0], t_eval=np.linspace(0, 20, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e9.t, sim_e9.y[0], color='darkmagenta', linewidth=2, label=r'Ángulo $\theta(t)$')
+plt.plot(sim_e9.t, sim_e9.y[1], color='goldenrod', linestyle='--', label=r'Velocidad Angular $\theta\'(t)$')
+plt.xlabel('t')
+plt.title('Ejercicio 9: Péndulo Simple sin Linealización', fontweight='bold', color='purple')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 10
+
+**Enunciado:** Simulación de un circuito eléctrico serie RLC: $LQ'' + RQ' + \frac{1}{C}Q = V(t)$. Analice el comportamiento con los parámetros de red $L = 0.5$, $R = 2$, $C = 5$ y una fuente de tensión armónica $V(t) = \sin(t)$.
+
+### Enfoque Analítico:
+Comprendiendo la corriente del circuito como la variación temporal directa de la carga de electrones ($I = Q'$), reescribimos la topología como un sistema bidimensional de primer orden:
+$$Q' = I, \quad I' = \frac{1}{L}\left(\sin(t) - RI - \frac{1}{C}Q\right)$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_circuito_rlc(t, Q, L, R, C):
+    return [Q[1], (1/L) * (np.sin(t) - R*Q[1] - Q[0]/C)]
+
+sim_e10 = integrate.solve_ivp(f_circuito_rlc, [0, 20], [0, 0], t_eval=np.linspace(0, 20, 600), args=(0.5, 2, 5))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e10.t, sim_e10.y[0], color='teal', linewidth=2.2, label='Carga Q(t) (Coulombs)')
+plt.plot(sim_e10.t, sim_e10.y[1], color='crimson', linestyle='--', label='Corriente I(t) (Amperes)')
+plt.xlabel('Tiempo (t)')
+plt.title('Ejercicio 10: Respuesta de Red del Circuito RLC', fontweight='bold', color='darkslategray')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 11
+
+**Enunciado:** Resolución para la ecuación diferencial de Bessel aproximada de segundo orden: $x^2y'' + xy' + (x^2 - 1)y = 0$, parametrizada por las condiciones iniciales $y(1) = 0.5,\ y'(1) = -0.1$.
+
+### Enfoque Analítico:
+Efectuando el despeje algebraico de la aceleración respecto a la base temporal acoplada $x^2$, determinamos:
+$$y' = v, \quad v' = \frac{-xv - (x^2 - 1)y}{x^2}$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_bessel_sys(t, U):
+    return [U[1], (-t*U[1] - (t**2 - 1)*U[0]) / (t**2)]
+
+sim_e11 = integrate.solve_ivp(f_bessel_sys, [1, 20], [0.5, -0.1], t_eval=np.linspace(1, 20, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e11.t, sim_e11.y[0], color='indigo', linewidth=2, label='y(x)')
+plt.plot(sim_e11.t, sim_e11.y[1], color='darkkhaki', linestyle='--', label="y'(x)")
+plt.xlabel('Variable Independiente x')
+plt.title('Ejercicio 11: Perfil de la Función de Bessel', fontweight='bold', color='darkblue')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 12
+
+**Enunciado:** Tratamiento numérico de la ecuación diferencial trascendente no lineal: $y'' + y e^y = \sin(t)$, con condiciones iniciales de borde fijadas en $y(0) = 0,\ y'(0) = 1$.
+
+### Enfoque Analítico:
+El potencial elástico del sistema queda modificado de manera no lineal por el producto de carácter exponencial $y e^y$:
+$$y' = v, \quad v' = \sin(t) - y e^y$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_transcendente_sys(t, U):
+    return [U[1], np.sin(t) - U[0]*np.exp(U[0])]
+
+sim_e12 = integrate.solve_ivp(f_transcendente_sys, [0, 15], [0, 1], t_eval=np.linspace(0, 15, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e12.t, sim_e12.y[0], color='darkgreen', linewidth=2, label='Trayectoria y(t)')
+plt.plot(sim_e12.t, sim_e12.y[1], color='salmon', linestyle='--', label="Velocidad y'(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 12: Sistema Exponencial No Lineal', fontweight='bold', color='darkgreen')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 13
+
+**Enunciado:** Simulación de una cuerda vibratoria sujeta a una fuerza excitadora armónica externa: $y'' = -\pi^2 y + \cos(2\pi t)$, con valores iniciales estipulados en $y(0) = 1,\ y'(0) = 0$.
+
+### Enfoque Analítico:
+Este modelo formula de manera simplificada las oscilaciones forzadas en un medio elástico continuo:
+$$y' = v, \quad v' = -\pi^2 y + \cos(2\pi t)$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_cuerda_vibrante(t, U):
+    return [U[1], -(np.pi**2)*U[0] + np.cos(2*np.pi*t)]
+
+sim_e13 = integrate.solve_ivp(f_cuerda_vibrante, [0, 6], [1, 0], t_eval=np.linspace(0, 6, 500))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e13.t, sim_e13.y[0], color='orangered', linewidth=2, label='Perfil y(t)')
+plt.plot(sim_e13.t, sim_e13.y[1], color='navy', linestyle='--', label="Tasa y'(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 13: Comportamiento de Cuerda Elástica', fontweight='bold', color='maroon')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 14
+
+**Enunciado:** Reducción y aproximación de una ecuación diferencial ordinaria homogénea de tercer orden: $y''' - 3y'' + 3y' - y = 0$, restringida por los valores iniciales $y(0) = 1,\ y'(0) = 0,\ y''(0) = 1$.
+
+### Enfoque Analítico:
+Para ecuaciones diferenciales ordinarias de tercer orden, se requiere estructurar un vector tridimensional de variables de estado definido por $U = [y, v, a]^T$, reduciendo algebraicamente la expresión a:
+$$y' = v, \quad v' = a, \quad a' = 3a - 3v + y$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_tercer_orden_homog(t, U):
+    return [U[1], U[2], 3*U[2] - 3*U[1] + U[0]]
+
+sim_e14 = integrate.solve_ivp(f_tercer_orden_homog, [0, 5], [1, 0, 1], t_eval=np.linspace(0, 5, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e14.t, sim_e14.y[0], color='royalblue', linewidth=2.5, label='y(t) (Posición)')
+plt.plot(sim_e14.t, sim_e14.y[1], color='darkorange', linestyle='--', label="y'(t) (Velocidad)")
+plt.plot(sim_e14.t, sim_e14.y[2], color='black', linestyle=':', label="y''(t) (Aceleración)")
+plt.xlabel('Tiempo (t)')
+plt.title('Ejercicio 14: Sistema Lineal de Tercer Orden', fontweight='bold', color='navy')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 15
+
+**Enunciado:** EDO de tercer orden no lineal: $y''' + y^2 = 0$, sujeta a las condiciones de frontera $y(0) = 1,\ y'(0) = 0,\ y''(0) = 0$.
+
+### Enfoque Analítico:
+La derivada de tercer orden se encuentra penalizada por la magnitud no lineal del cuadrado de la variable de desplazamiento:
+$$y' = v, \quad v' = a, \quad a' = -y^2$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_no_lineal_t3(t, U):
+    return [U[1], U[2], -U[0]**2]
+
+sim_e15 = integrate.solve_ivp(f_no_lineal_t3, [0, 6], [1, 0, 0], t_eval=np.linspace(0, 6, 400))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e15.t, sim_e15.y[0], color='darkred', linewidth=2.2, label='y(t)')
+plt.plot(sim_e15.t, sim_e15.y[1], color='mediumseagreen', linestyle='--', label="y'(t)")
+plt.plot(sim_e15.t, sim_e15.y[2], color='blue', linestyle=':', label="y''(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 15: Dinámica No Lineal de Tercer Orden', fontweight='bold', color='darkred')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 16
+
+**Enunciado:** Simulación de un oscilador cúbico forzado de tercer orden: $y''' + y'' + y^3 = \cos(t)$, inicializado bajo los parámetros de reposo y velocidad unitaria $y(0) = 0,\ y'(0) = 1,\ y''(0) = 0$.
+
+### Enfoque Analítico:
+Se deconstruye asignando los componentes vectoriales correspondientes al espacio tridimensional de fases:
+$$y' = v, \quad v' = a, \quad a' = \cos(t) - a - y^3$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_oscilador_cubico_t3(t, U):
+    return [U[1], U[2], np.cos(t) - U[2] - U[0]**3]
+
+sim_e16 = integrate.solve_ivp(f_oscilador_cubico_t3, [0, 15], [0, 1, 0], t_eval=np.linspace(0, 15, 500))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e16.t, sim_e16.y[0], color='purple', linewidth=2, label='y(t)')
+plt.plot(sim_e16.t, sim_e16.y[1], color='gold', linestyle='--', label="y'(t)")
+plt.plot(sim_e16.t, sim_e16.y[2], color='teal', linestyle=':', label="y''(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 16: Oscilador Forzado No Lineal de Tercer Orden', fontweight='bold', color='purple')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 17
+
+**Enunciado:** Simulación numérica de la ecuación simplificada de Korteweg-de Vries (KdV) para procesos dispersivos: $y''' - 6yy' = 0$, parametrizada por $y(0) = 2,\ y'(0) = 0,\ y''(0) = -1$.
+
+### Enfoque Analítico:
+Esta ecuación diferencial fundamenta de manera teórica la propagación subacuática de ondas de choque de carácter solitario. Reduciendo sus variables obtenemos:
+$$y' = v, \quad v' = a, \quad a' = 6yv$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_kdv_simplificada(t, U):
+    return [U[1], U[2], 6*U[0]*U[1]]
+
+sim_e17 = integrate.solve_ivp(f_kdv_simplificada, [0, 1.5], [2, 0, -1], t_eval=np.linspace(0, 1.5, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e17.t, sim_e17.y[0], color='darkorange', linewidth=2.2, label='Amplitud y(t)')
+plt.plot(sim_e17.t, sim_e17.y[1], color='navy', linestyle='--', label="Gradiente y'(t)")
+plt.plot(sim_e17.t, sim_e17.y[2], color='grey', linestyle=':', label="Curvatura y''(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 17: Simulación de la Ecuación Dispersiva KdV', fontweight='bold', color='darkorange')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 18
+
+**Enunciado:** Modelo no lineal de conducción hidrodinámica: $y''' = -y y'' + y'$, sujeta a las condiciones vectoriales iniciales $y(0) = 1,\ y'(0) = 0,\ y''(0) = -1$.
+
+### Enfoque Analítico:
+La componente de desplazamiento acopla directamente la aceleración de curvatura del fluido, reescribiéndose como:
+$$y' = v, \quad v' = a, \quad a' = -ya + v$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_conduccion_hidro(t, U):
+    return [U[1], U[2], -U[0]*U[2] + U[1]]
+
+sim_e18 = integrate.solve_ivp(f_conduccion_hidro, [0, 6], [1, 0, -1], t_eval=np.linspace(0, 6, 450))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e18.t, sim_e18.y[0], color='teal', linewidth=2, label='y(t)')
+plt.plot(sim_e18.t, sim_e18.y[1], color='crimson', linestyle='--', label="y'(t)")
+plt.plot(sim_e18.t, sim_e18.y[2], color='darkmagenta', linestyle=':', label="y''(t)")
+plt.xlabel('t')
+plt.title('Ejercicio 18: Modelo de Conducción Fluidodinámica', fontweight='bold', color='darkcyan')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 19
+
+**Enunciado:** Modelado comercial y financiero de activos bancarios[cite: 76]. Se apertura una cuenta con un capital neto inicial de 2000 dólares ($b(0) = 2000$). La entidad financiera aplica una tasa de interés compuesta continua del 5% anual. Adicionalmente, el usuario inyecta capital de manera continua a una tasa anual inicial $s(0) = 500$ dólares, la cual se expande continuamente un 4% por año debido al incremento de sus ingresos marginales. Deduzca el sistema de ecuaciones y represente la acumulación de capital.
+
+### Enfoque Analítico:
+El saldo neto se expande por efecto del interés compuesto acumulado sumado al flujo dinámico de aportaciones, el cual se incrementa de forma puramente exponencial:
+$$b' = 0.05b + s, \quad s' = 0.04s$$
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_modelo_financiero(t, U):
+    saldo_b, aporte_s = U
+    return [0.05*saldo_b + aporte_s, 0.04*aporte_s]
+
+sim_e19 = integrate.solve_ivp(f_modelo_financiero, [0, 20], [2000, 500], t_eval=np.linspace(0, 20, 300))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e19.t, sim_e19.y[0], color='mediumseagreen', linewidth=2.5, label='Evolución del Saldo b(t)')
+plt.plot(sim_e19.t, sim_e19.y[1], color='darkorange', linestyle='--', label='Tasa de Depósito s(t)')
+plt.xlabel('Periodo de Proyección (Años)')
+plt.ylabel('Escala en Dólares ($)')
+plt.title('Ejercicio 19: Proyección de Activos y Capitalización Continua', fontweight='bold', color='darkgreen')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 20
+
+**Enunciado:** Simulación numérica del sistema lineal acoplado: $x'(t) = -6x - 3y$, $y'(t) = -15x + 6y$, condicionado por los parámetros iniciales $x(0)=3, y(0)=2$. Grafique la respuesta temporal de los estados y mapee la trayectoria geométrica en el espacio de fases.
+
+### Enfoque Analítico:
+Representa un sistema continuo plano interactuante. Al remover analíticamente el tiempo, las variables graficadas una contra la otra delimitan el retrato de fases característico del equilibrio numérico.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_sistema_lineal_e20(t, U):
+    return [-6*U[0] - 3*U[1], -15*U[0] + 6*U[1]]
+
+sim_e20 = integrate.solve_ivp(f_sistema_lineal_e20, [0, 2], [3, 2], t_eval=np.linspace(0, 2, 500))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e20.t, sim_e20.y[0], color='dodgerblue', linewidth=2, label='x(t)')
+graf_t.plot(sim_e20.t, sim_e20.y[1], color='firebrick', linewidth=2, label='y(t)')
+graf_t.set_title('Respuesta Temporal de los Estados')
+graf_t.set_xlabel('Tiempo')
+graf_t.legend()
+
+graf_fase.plot(sim_e20.y[0], sim_e20.y[1], color='darkmagenta', linewidth=2)
+graf_fase.set_xlabel('Coordenada x')
+graf_fase.set_ylabel('Coordenada y')
+graf_fase.set_title('Mapeo en el Plano de Fase')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 21
+
+**Enunciado:** Estudio biológico de coexistencia poblacional en un hábitat cerrado: $x'(t) = 1.4x - y$, $y'(t) = -1.25x + 3.4y$, partiendo de una población inicial definida por $x(0)=7$ y $y(0)=3$. Grafique las trayectorias de poblamiento relativas al eje temporal $t$.
+
+### Enfoque Analítico:
+El modelo linealiza la interacción competitiva directa de dos comunidades biológicas compartiendo la tasa de natalidad y mortalidad del ecosistema.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_poblaciones_e21(t, U):
+    return [1.4*U[0] - U[1], -1.25*U[0] + 3.4*U[1]]
+
+sim_e21 = integrate.solve_ivp(f_poblaciones_e21, [0, 3], [7, 3], t_eval=np.linspace(0, 3, 300))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e21.t, sim_e21.y[0], color='teal', linewidth=2, label='Comunidad X(t)')
+plt.plot(sim_e21.t, sim_e21.y[1], color='deeppink', linestyle='--', label='Comunidad Y(t)')
+plt.xlabel('Tiempo de Observación')
+plt.ylabel('Censo Poblacional')
+plt.title('Ejercicio 21: Dinámica Lineal de Especies Coexistentes', fontweight='bold', color='darkcyan')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 22
+
+**Enunciado:** Aproximación de la solución para el sistema lineal de ecuaciones diferenciales: $y_1' = -6.2 + 1.1y_1 - 0.8y_2$, $y_2' = -13.8 + 2.1y_1 - 1.2y_2$, sujeta a las condiciones de origen $y_1(0)=11$ y $y_2(0)=4$. Grafique el comportamiento de las funciones y exponga la trayectoria de fase.
+
+### Enfoque Analítico:
+La inclusión de coeficientes constantes independientes desplaza el centro geométrico del punto de equilibrio dinámico del plano fuera del origen algebraico.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_sistema_lineal_e22(t, U):
+    return [-6.2 + 1.1*U[0] - 0.8*U[1], -13.8 + 2.1*U[0] - 1.2*U[1]]
+
+sim_e22 = integrate.solve_ivp(f_sistema_lineal_e22, [0, 4], [11, 4], t_eval=np.linspace(0, 4, 500))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e22.t, sim_e22.y[0], color='darkgreen', label='$y_1(t)$')
+graf_t.plot(sim_e22.t, sim_e22.y[1], color='orangered', label='$y_2(t)$')
+graf_t.set_xlabel('t')
+graf_t.legend()
+
+graf_fase.plot(sim_e22.y[0], sim_e22.y[1], color='purple', linewidth=2)
+graf_fase.set_xlabel('$y_1$')
+graf_fase.set_ylabel('$y_2$')
+graf_fase.set_title('Trayectoria Espacial de Fase')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 23
+
+**Enunciado:** Sistema ecológico logístico regulado por depredación: $x' = x(1 - x) - xy$, $y' = -y + xy$, inicializado bajo las condiciones de densidad $x(0) = 0.9$ y $y(0) = 0.1$[cite: 87]. Grafique la evolución de los estados y mapee el diagrama de fase.
+
+### Enfoque Analítico:
+A diferencia de los esquemas lineales puros, este modelo restringe la expansión biológica de las presas mediante una capacidad de carga máxima ambiental acotada por el término logístico ($1-x$).
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_logistico_depredacion(t, U):
+    return [U[0]*(1 - U[0]) - U[0]*U[1], -U[1] + U[0]*U[1]]
+
+sim_e23 = integrate.solve_ivp(f_logistico_depredacion, [0, 30], [0.9, 0.1], t_eval=np.linspace(0, 30, 600))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e23.t, sim_e23.y[0], color='mediumseagreen', linewidth=2, label='Densidad Presas x(t)')
+graf_t.plot(sim_e23.t, sim_e23.y[1], color='darkviolet', linewidth=2, label='Densidad Depredadores y(t)')
+graf_t.set_xlabel('Tiempo')
+graf_t.legend()
+
+graf_fase.plot(sim_e23.y[0], sim_e23.y[1], color='darkcyan', linewidth=2)
+graf_fase.set_title('Retrato en el Plano de Fase')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 24
+
+**Enunciado:** Simulación avanzada del Oscilador No Lineal de Van der Pol: $x' = y$, $y' = \mu (1 - x^2)y - x$, con $x(0) = 2,\quad y(0) = 0,\quad \mu = 3$. Analice y visualice la deformación geométrica de las órbitas y el plano de fase variando el coeficiente de no linealidad $\mu$.
+
+### Enfoque Analítico:
+El término disipativo variable $\mu(1-x^2)y$ actúa de manera adaptativa: amortigua movimientos de gran envergadura ($x > 1$) e inyecta energía en oscilaciones tenues ($x < 1$), forzando mecánicamente al sistema a converger hacia un ciclo límite cerrado.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_vanderpol_param(t, U, mu):
+    return [U[1], mu * (1 - U[0]**2) * U[1] - U[0]]
+
+plt.figure(figsize=(7.5, 4.2))
+colores_vdp = ['royalblue', 'orange', 'forestgreen', 'crimson', 'purple']
+for i, m_val in enumerate([3, 5, 10, 15, 20]): # Muestra las órbitas de Van der Pol solicitadas
+    sim_vdp = integrate.solve_ivp(f_vanderpol_param, [0, 20], [2, 0], t_eval=np.linspace(0, 20, 1500), args=(m_val,))
+    plt.plot(sim_vdp.y[0], sim_vdp.y[1], color=colores_vdp[i], label=rf'$\mu$ = {m_val}')
+
+plt.xlabel('Desplazamiento (x)')
+plt.ylabel('Velocidad (y)')
+plt.title('Ejercicio 24: Órbitas Estables del Oscilador de Van der Pol', fontweight='bold', color='darkblue')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 25
+
+**Enunciado:** Sistema clásico de depredador-presa Lotka-Volterra estructurado bajo las tasas constantes: $\alpha = 1.5,\ \beta = 1,\ \delta = 1,\ \gamma = 3$, con poblaciones iniciales de $x(0) = 10, y(0) = 5$. Grafique las funciones y su órbita periódica.
+
+### Enfoque Analítico:
+Constituye la formulación clásica no lineal de interacción poblacional. Da lugar a órbitas infinitas perfectamente cerradas y conservativas alrededor de su centro de equilibrio estable.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_lotka_volterra(t, U):
+    return [1.5*U[0] - 1.0*U[0]*U[1], 1.0*U[0]*U[1] - 3.0*U[1]]
+
+sim_e25 = integrate.solve_ivp(f_lotka_volterra, [0, 25], [10, 5], t_eval=np.linspace(0, 25, 1200))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e25.t, sim_e25.y[0], color='blue', label='Presas (x)')
+graf_t.plot(sim_e25.t, sim_e25.y[1], color='goldenrod', label='Depredadores (y)')
+graf_t.set_xlabel('Tiempo')
+graf_t.legend()
+
+graf_fase.plot(sim_e25.y[0], sim_e25.y[1], color='darkolivegreen', linewidth=2)
+graf_fase.set_title('Órbita de Fase Cerrada')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 26
+
+**Enunciado:** Interacción no lineal acoplada por funciones trascendentes: $x' = \sin(y) - x^3$, $y' = \cos(x) - y^2$, partiendo de las coordenadas iniciales $x(0) = 1, y(0) = 0$. Grafique las funciones temporales y mapee su trayectoria.
+
+### Enfoque Analítico:
+El confinamiento ejercido por las funciones trigonométricas armónicas operando de manera conjunta con la disipación de orden cúbico la estabilidad asintótica de las trayectorias.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_seno_coseno_sys(t, U):
+    return [np.sin(U[1]) - U[0]**3, np.cos(U[0]) - U[1]**2]
+
+sim_e26 = integrate.solve_ivp(f_seno_coseno_sys, [0, 15], [1, 0], t_eval=np.linspace(0, 15, 450))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e26.t, sim_e26.y[0], color='teal', label='x(t)')
+graf_t.plot(sim_e26.t, sim_e26.y[1], color='magenta', label='y(t)')
+graf_t.legend()
+
+graf_fase.plot(sim_e26.y[0], sim_e26.y[1], color='chocolate')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 27
+
+**Enunciado:** Modelo excitador de FitzHugh-Nagumo para la activación bioeléctrica neuronal: $v' = v - \frac{v^3}{3} - w + I$, $w' = 0.08(v + 0.7 - 0.8w)$, sujeta a las condiciones de inicio $v(0) = -1,\quad w(0) = 1$, con un estímulo de corriente continuo $I = 0.5$. Grafique las funciones y el plano de fase.
+
+### Enfoque Analítico:
+Modela la dinámica de la membrana celular de una neurona, correlacionando el potencial eléctrico transmisor ($v$) frente a la relajación y recuperación de los canales iónicos de sodio/potasio ($w$).
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_fitzhugh_nagumo(t, U):
+    return [U[0] - (U[0]**3)/3 - U[1] + 0.5, 0.08*(U[0] + 0.7 - 0.8*U[1])]
+
+sim_e27 = integrate.solve_ivp(f_fitzhugh_nagumo, [0, 100], [-1, 1], t_eval=np.linspace(0, 100, 1500))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e27.t, sim_e27.y[0], color='navy', label='Potencial de Membrana v(t)')
+graf_t.plot(sim_e27.t, sim_e27.y[1], color='crimson', label='Canal de Recuperación w(t)')
+graf_t.set_xlabel('Tiempo')
+graf_t.legend()
+
+graf_fase.plot(sim_e27.y[0], sim_e27.y[1], color='purple', linewidth=2)
+graf_fase.set_title('Espacio de Fase (Ciclo Neuronal)')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 28
+
+**Enunciado:** Aproximación numérica de un sistema dinámico no autónomo: $x' = x \sin(t) + y^2$, $y' = -y \cos(t) + x$, con valores iniciales planteados en $x(0) = 1,\quad y(0) = -1$. Grafique las variables temporales y su respectiva trayectoria.
+
+### Enfoque Analítico:
+Al involucrar explícitamente el parámetro temporal $t$ externo en las funciones directas $\sin(t)$ y $\cos(t)$, el campo de vectores se deforma continuamente, permitiendo el cruce aparente de órbitas.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_no_autonomo_sys(t, U):
+    return [U[0]*np.sin(t) + U[1]**2, -U[1]*np.cos(t) + U[0]]
+
+sim_e28 = integrate.solve_ivp(f_no_autonomo_sys, [0, 10], [1, -1], t_eval=np.linspace(0, 10, 800))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e28.t, sim_e28.y[0], color='dodgerblue', label='x(t)')
+graf_t.plot(sim_e28.t, sim_e28.y[1], color='darkslategray', label='y(t)')
+graf_t.legend()
+
+graf_fase.plot(sim_e28.y[0], sim_e28.y[1], color='orangered')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 29
+
+**Enunciado:** Modelo compartimental epidemiológico SIR: $\frac{dS}{dt} = -\beta S I$, $\frac{dI}{dt} = \beta S I - \gamma I$, $\frac{dR}{dt} = \gamma I$, configurado con las constantes epidemiológicas $\beta = 0.5,\ \gamma = 0.1$, y densidades de inicio $S(0) = 0.99,\quad I(0) = 0.01,\quad R(0) = 0$. *(Nota: Por instrucción del problema, para este modelo omitiremos la trayectoria de fase).*
+
+### Enfoque Analítico:
+Mapea matemáticamente la velocidad de propagación de una afección vírica sobre una población cerrada, distribuyéndola dinámicamente entre individuos Susceptibles ($S$), Infectados ($I$) y Recuperados o Removidos ($R$).
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_modelo_sir(t, U):
+    return [-0.5*U[0]*U[1], 0.5*U[0]*U[1] - 0.1*U[1], 0.1*U[1]]
+
+sim_e29 = integrate.solve_ivp(f_modelo_sir, [0, 140], [0.99, 0.01, 0.0], t_eval=np.linspace(0, 140, 500))
+
+plt.figure(figsize=(7.5, 3.6))
+plt.plot(sim_e29.t, sim_e29.y[0], label='Susceptibles (S)', color='royalblue', linewidth=2)
+plt.plot(sim_e29.t, sim_e29.y[1], label='Infectados (I)', color='crimson', linewidth=2)
+plt.plot(sim_e29.t, sim_e29.y[2], label='Recuperados (R)', color='forestgreen', linewidth=2)
+plt.xlabel('Eje de Tiempo (Días)')
+plt.ylabel('Fracción de la Población Total')
+plt.title('Ejercicio 29: Curvas de Evolución Epidemiológica SIR', fontweight='bold', color='darkcyan')
+plt.legend()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 30
+
+**Enunciado:** Crecimiento población logístico cruzado competitiva: $x' = x(1 - x - 0.5y)$, $y' = y(1 - y - 0.3x)$, con densidades de colonización iniciales $x(0) = 0.5,\quad y(0) = 0.2$. Grafique las funciones y el plano de fase.
+
+### Enfoque Analítico:
+Formula matemáticamente la disputa y competencia por recursos limitados de dos especies independientes. La expansión de cualquiera de ellas reduce la capacidad de carga neta del ecosistema de su contraparte[cite: 95].
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_logistico_cruzado(t, U):
+    return [U[0]*(1 - U[0] - 0.5*U[1]), U[1]*(1 - U[1] - 0.3*U[0])]
+
+sim_e30 = integrate.solve_ivp(f_logistico_cruzado, [0, 30], [0.5, 0.2], t_eval=np.linspace(0, 30, 500))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e30.t, sim_e30.y[0], color='darkgreen', label='Especie X(t)')
+graf_t.plot(sim_e30.t, sim_e30.y[1], color='gold', label='Especie Y(t)')
+graf_t.set_xlabel('Tiempo')
+graf_t.legend()
+
+graf_fase.plot(sim_e30.y[0], sim_e30.y[1], color='darkmagenta')
+graf_fase.set_xlabel('x')
+graf_fase.set_ylabel('y')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 31
+
+**Enunciado:** Movimiento inercial en un campo de fuerzas no lineal amortiguado: $x' = y$, $y' = -\sin(x) - 0.5 y$, inicializado bajo los parámetros de desplazamiento y reposo $x(0) = \pi/2,\quad y(0) = 0$. Grafique las funciones y el plano de fase.
+
+### Enfoque Analítico:
+Es el espacio de fases real de un péndulo torsional afectado por una fricción viscosa constante de aire (fuerza $-0.5y$). Las órbitas describen trayectorias espiraladas que convergen asintóticamente hacia el punto de equilibrio estable.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_campo_no_lineal_s31(t, U):
+    return [U[1], -np.sin(U[0]) - 0.5*U[1]]
+
+sim_e31 = integrate.solve_ivp(f_campo_no_lineal_s31, [0, 25], [np.pi/2, 0], t_eval=np.linspace(0, 25, 600))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e31.t, sim_e31.y[0], color='indigo', label='Posición angular x(t)')
+graf_t.plot(sim_e31.t, sim_e31.y[1], color='darkorange', label='Velocidad angular y(t)')
+graf_t.legend()
+
+graf_fase.plot(sim_e31.y[0], sim_e31.y[1], color='saddlebrown')
+graf_fase.set_xlabel('Ángulo x')
+graf_fase.set_ylabel('Velocidad y')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+# Ejercicio 32
+
+**Enunciado:** Sistema dinámico no lineal acoplado con pérdidas cruzadas de orden superior: $x' = x(1 - x) - xy^2$, $y' = y(1 - y) - x^2y$, partiendo del estado de inicialización $x(0) = 0.8,\quad y(0) = 0.6$. Grafique las funciones y el plano de fase.
+
+### Enfoque Analítico:
+El acoplamiento mediante términos multiplicativos cúbicos ($xy^2$ y $x^2y$) induce fuertes dinámicas de competencia transitoria antes de forzar a las variables a estabilizarse asintóticamente hacia sus puntos fijos de equilibrio plano.
+
+```{python}
+#| code-fold: true
+#| fig-align: "center"
+
+def f_acoplado_no_lineal_s32(t, U):
+    return [U[0]*(1 - U[0]) - U[0]*(U[1]**2), U[1]*(1 - U[1]) - (U[0]**2)*U[1]]
+
+sim_e32 = integrate.solve_ivp(f_acoplado_no_lineal_s32, [0, 25], [0.8, 0.6], t_eval=np.linspace(0, 25, 500))
+
+fig, (graf_t, graf_fase) = plt.subplots(1, 2, figsize=(11, 3.8))
+graf_t.plot(sim_e32.t, sim_e32.y[0], color='purple', label='x(t)')
+graf_t.plot(sim_e32.t, sim_e32.y[1], color='teal', label='y(t)')
+graf_t.legend()
+
+graf_fase.plot(sim_e32.y[0], sim_e32.y[1], color='navy')
+graf_fase.set_xlabel('x')
+graf_fase.set_ylabel('y')
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+---
+
+### Conclusión General
+El desarrollo pormenorizado de las 32 simulaciones demuestra que el análisis cualitativo y cuantitativo mediante métodos multipaso numéricos resulta fundamental para caracterizar de forma exacta y predecir los estados transitorios y asintóticos de sistemas físicos y biológicos complejos.
